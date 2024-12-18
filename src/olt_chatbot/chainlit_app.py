@@ -9,14 +9,14 @@ from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnableConfig
 from loguru import logger
 
-from olt_chatbot.chat_model import get_cited_rag_chain
+from olt_chatbot.chat_model import get_cited_rag_chain_for_streaming
 
 
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Runs when a new chat session is created."""
     logger.debug("Starting new chat session")
-    chain = get_cited_rag_chain()
+    chain = get_cited_rag_chain_for_streaming()
     cl.user_session.set("chain", chain)
     cl.user_session.set("chat_history", ChatMessageHistory())
 
@@ -84,18 +84,29 @@ async def on_message(message: cl.Message) -> None:
     ai_answer = chunk["cited_answer"].get("answer", "")
 
     # Extract the citations and create elements for the message
-    cited_docs: list[str] = chunk["cited_answer"].get("citations", [])
-    print(f"{cited_docs=}")
+    cited_doc_indices: list[str] = chunk["cited_answer"].get("citations", [])
 
-    # Create a list of cited URLs
-    cited_urls = set()
-    for citation in cited_docs:
-        cited_urls.add(retrieved_docs[int(citation)].metadata["source"])
+    # There could potentially be multiple chunks retrieved from the same document.
+    # Create a dict of unique document metadata, where the key is the source field.
+    cited_metadata = {}
+    for i in cited_doc_indices:
+        metadata = retrieved_docs[int(i)].metadata
+        if metadata["source"] not in cited_metadata:
+            cited_metadata[metadata["source"]] = metadata
 
-    if cited_urls:
+    # Add the citations to the message
+    if cited_metadata:
         msg.content += "\n\nKilder:\n\n"
-        for url in cited_urls:
-            msg.content += f"1. {url}\n"
+        for metadata in cited_metadata.values():
+            if "title" in metadata and metadata["source"].startswith("http"):
+                # HTML pages will be shown as links with a title
+                markdown_string = f"[{metadata['title']}]({metadata['source']})"
+            else:
+                # PDFs will be shown as plain text with a link
+                markdown_string = metadata["source"]
+
+            # Create a numbered list of citations
+            msg.content += f"1. {markdown_string}\n"
         await msg.update()
 
     # Update the chat history

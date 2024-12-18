@@ -96,41 +96,7 @@ def format_docs_with_id(docs: list[Document]) -> str:
     return "\n\n".join(formatted)
 
 
-def get_chain_without_history(
-    llm_name: str = "gpt-4o",
-) -> Runnable[str, dict[str, Any]]:
-    """Get the QA chain for Cited Answers."""
-    llm = LLM_GENERATORS[llm_name]
-    llm_with_tool = llm.with_structured_output(CitedAnswer)
-    retriever = load_retriever_from_disk(k=20)
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                (
-                    "You are a helpful AI assistant. You answer question in Norwegian. "
-                    "You are working at Olympiatoppen. "
-                    "Given a user question and some context, answer the user question. "
-                    "If you dont know the answer, just say you dont know.\n\n"
-                    "Here is the context: \n\n{context}"
-                ),
-            ),
-            ("human", "{question}"),
-        ]
-    )
-
-    formatted_docs = itemgetter("docs") | RunnableLambda(format_docs_with_id)
-    answer_chain = prompt | llm_with_tool
-    return (
-        RunnableParallel(question=RunnablePassthrough(), docs=retriever)
-        .assign(context=formatted_docs)
-        .assign(cited_answer=answer_chain)
-        .pick(["cited_answer", "docs"])
-    )
-
-
-def get_cited_rag_chain(
+def get_cited_rag_chain_for_streaming(
     llm_name: str = "gpt-4o-mini",
 ) -> Runnable[str, dict[str, Any]]:
     """Get the QA chain for Cited Answers."""

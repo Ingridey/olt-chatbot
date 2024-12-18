@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Credentials for OpenAI API
     OPENAI_API_KEY: SecretStr = cast(SecretStr, "")
 
+    # Directory with extra PDF documents to be indexed
+    EXTRA_DOCUMENTS_DIRECTORY: Path = Path(__file__).parents[2].absolute() / "fagstoff"
+
     # Where to put the database files
     OUTPUT_DIRECTORY: Path = Path(__file__).parents[2].absolute() / "output"
 
@@ -34,8 +37,8 @@ class Settings(BaseSettings):
 
     # BM25 Retriever
     @property
-    def BM25_RETRIEVER_PATH(self) -> str:  # noqa: D102, N802
-        return str(self.OUTPUT_DIRECTORY / "bm25-retriever.pkl")
+    def BM25_RETRIEVER_PATH(self) -> Path:  # noqa: D102, N802
+        return self.OUTPUT_DIRECTORY / "bm25-retriever.pkl"
 
     class Config:
         """Class configuration."""
