@@ -23,15 +23,21 @@ We will also index the content of some PDF files that are included as part of th
 project.
 
 ```bash
-python -m olt_chatbot.tasks
+uv run update-retrievers
 ```
 
 # Start the webapp
 
-Use the chainlit CLI to start the webapp:
+The chainlit webapp listens to http://localhost:8888 by default. If you want it to
+listen to another port, set the environmental variable `CHAINLIT_PORT`. To start the
+chainlit webapp, run:
 
 ```bash
-uv run chainlit run --watch --headless --port 8764 src/olt_chatbot/chainlit_app.py
+# Start the chainlit webapp on port 8888
+uv run start-chainlit
+
+# Optionally: Specify some other port
+CHAINLIT_PORT=8910 uv run start-chainlit
 ```
 
 You can then point your browser to http://localhost:8764
