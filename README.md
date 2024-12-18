@@ -8,11 +8,10 @@ the correct Python-version and all project dependencies, run:
 uv sync
 ```
 
-To install and activate the pre-commit tool:
+To activate the pre-commit hooks, run:
 
 ```bash
-uv tool install pre-commit
-pre-commit install
+uv run pre-commit install
 ```
 
 # Updating the retriever databases
