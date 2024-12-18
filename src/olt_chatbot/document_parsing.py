@@ -49,13 +49,14 @@ def clean_text(text: str) -> str:
 
 def text_extractor_from_response(response: requests.models.Response) -> str:
     """Extract text from an string that has been downloaded from a URL."""
+    content_type = response.headers.get("Content-Type", "")
     try:
-        if response.headers["Content-Type"].startswith("text/html"):
+        if content_type.startswith("text/html"):
             logger.info("Extracting text from HTML")
             text = BeautifulSoup(response.text, "html.parser").text.strip()
             return clean_text(text)
 
-        if response.headers["Content-Type"] == "application/pdf":
+        if content_type == "application/pdf":
             logger.info("Extracting text from PDF: " + response.url)
             text = clean_text(extract_pdf_text(response.content))
             if not text:
@@ -64,9 +65,7 @@ def text_extractor_from_response(response: requests.models.Response) -> str:
                 )
             return text
 
-        logger.warning(
-            "Ignoring response of unknown type: " f"{response.headers['Content-Type']}"
-        )
+        logger.warning(f"Ignoring text of unknown content type: {content_type}")
 
     except Exception:
         logger.warning(f"Error extracting text from {response.url}")
@@ -78,9 +77,16 @@ def metadata_extractor(
     raw_html: str, url: str, response: requests.Response
 ) -> dict[str, str]:
     """Extract metadata from a string that has been downloaded from a URL."""
-    metadata = langchain_metadata_extractor(raw_html, url, response)
-    # TODO: Possibly add custom metadata
-    return metadata  # noqa: RET504
+    content_type = response.headers.get("Content-Type", "")
+    if content_type.startswith("text/html"):
+        metadata = langchain_metadata_extractor(raw_html, url, response)
+    elif content_type == "application/pdf":
+        metadata = {"source": url}
+    else:
+        logger.info(
+            f"Ignoring metadata extraction for unknown content type: {content_type}."
+        )
+    return metadata
 
 
 def extract_pdf_text(pdf_data: bytes) -> str:
