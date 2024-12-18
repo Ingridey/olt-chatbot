@@ -3,6 +3,7 @@
 from operator import itemgetter
 from typing import Any
 
+from langchain.output_parsers.openai_tools import JsonOutputKeyToolsParser
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import (
@@ -18,6 +19,8 @@ from olt_chatbot.llm_models import LLM_GENERATORS
 from olt_chatbot.retrievers import load_retriever_from_disk
 
 
+# This is the response object from the model. It Forces the model to cite the sources
+# used.
 class CitedAnswer(BaseModel):
     """Answer the user question based only on the given sources, and cite the sources used."""  # noqa:E501
 
@@ -31,9 +34,6 @@ class CitedAnswer(BaseModel):
         ...,
         description="The reference of the SPECIFIC sources which justify the answer.",
     )
-
-
-# Gammelt"
 
 
 def get_chain_with_history(
@@ -87,19 +87,19 @@ def get_chain_with_history(
     ).assign(cited_answer=rag_chain_from_docs)
 
 
+def format_docs_with_id(docs: list[Document]) -> str:
+    """Format the retrieved documents with an enumerated ID."""
+    formatted = [
+        (f"Source ID: {i}\nArticle Snippet: {doc.page_content}")
+        for i, doc in enumerate(docs)
+    ]
+    return "\n\n".join(formatted)
+
+
 def get_chain_without_history(
     llm_name: str = "gpt-4o",
 ) -> Runnable[str, dict[str, Any]]:
     """Get the QA chain for Cited Answers."""
-
-    def format_docs_with_id(docs: list[Document]) -> str:
-        """Format the documents with an enumerated ID."""
-        formatted = [
-            (f"Source ID: {i}\nArticle Snippet: {doc.page_content}")
-            for i, doc in enumerate(docs)
-        ]
-        return "\n\n".join(formatted)
-
     llm = LLM_GENERATORS[llm_name]
     llm_with_tool = llm.with_structured_output(CitedAnswer)
     retriever = load_retriever_from_disk(k=20)
@@ -109,9 +109,9 @@ def get_chain_without_history(
             (
                 "system",
                 (
-                    "You are a helpful AI assistant. You answer question in Norwegian."
-                    "You are working at Olympiatoppen."
-                    "Given a user question and some context, answer the user question."
+                    "You are a helpful AI assistant. You answer question in Norwegian. "
+                    "You are working at Olympiatoppen. "
+                    "Given a user question and some context, answer the user question. "
                     "If you dont know the answer, just say you dont know.\n\n"
                     "Here is the context: \n\n{context}"
                 ),
@@ -122,6 +122,49 @@ def get_chain_without_history(
 
     formatted_docs = itemgetter("docs") | RunnableLambda(format_docs_with_id)
     answer_chain = prompt | llm_with_tool
+    return (
+        RunnableParallel(question=RunnablePassthrough(), docs=retriever)
+        .assign(context=formatted_docs)
+        .assign(cited_answer=answer_chain)
+        .pick(["cited_answer", "docs"])
+    )
+
+
+def get_cited_rag_chain(
+    llm_name: str = "gpt-4o-mini",
+) -> Runnable[str, dict[str, Any]]:
+    """Get the QA chain for Cited Answers."""
+    llm = LLM_GENERATORS[llm_name]
+    llm_with_tool = llm.bind_tools(
+        [CitedAnswer],
+        tool_choice="CitedAnswer",
+    )
+
+    retriever = load_retriever_from_disk(k=20)
+
+    output_parser = JsonOutputKeyToolsParser(
+        key_name="CitedAnswer", first_tool_only=True
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You're a helpful AI assistant, working at Olympiatoppen (OLT). "
+                    "You answer questions in Norwegian. "
+                    "Given a user question and some article snippets, answer the "
+                    "question. If none of the articles answer the question, just "
+                    "say you don't know.\n\n"
+                    "Here are the articles:\n\n{context}"
+                ),
+            ),
+            ("human", "{question}"),
+        ]
+    )
+
+    formatted_docs = itemgetter("docs") | RunnableLambda(format_docs_with_id)
+    answer_chain = prompt | llm_with_tool | output_parser
     return (
         RunnableParallel(question=RunnablePassthrough(), docs=retriever)
         .assign(context=formatted_docs)

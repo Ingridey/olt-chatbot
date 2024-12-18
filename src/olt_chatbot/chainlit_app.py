@@ -5,17 +5,18 @@ from typing import Any
 import chainlit as cl
 from chainlit.user import User
 from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnableConfig
 from loguru import logger
 
-from olt_chatbot.chat_model import get_chain_without_history
+from olt_chatbot.chat_model import get_cited_rag_chain
 
 
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Runs when a new chat session is created."""
     logger.debug("Starting new chat session")
-    chain = get_chain_without_history()
+    chain = get_cited_rag_chain()
     cl.user_session.set("chain", chain)
     cl.user_session.set("chat_history", ChatMessageHistory())
 
@@ -74,34 +75,32 @@ async def on_message(message: cl.Message) -> None:
     # Loop through the async stream and update the message
     async for chunk in async_stream:
         if "docs" in chunk:
-            retrieved_docs = chunk["docs"]  # noqa: F841
+            retrieved_docs: list[Document] = chunk["docs"]
         elif "cited_answer" in chunk:
-            msg.content = chunk["cited_answer"].answer
+            msg.content = chunk["cited_answer"].get("answer", "")
             await msg.update()
 
+    # Get the final answer, will be added to the history
+    ai_answer = chunk["cited_answer"].get("answer", "")
+
     # Extract the citations and create elements for the message
-    cited_docs = chunk["cited_answer"].citations
+    cited_docs: list[str] = chunk["cited_answer"].get("citations", [])
     print(f"{cited_docs=}")
 
-    # Prepare cited URLs
-    # cited_urls = set()
-    # for citation in response["cited_answer"]["citations"]:
-    #     cited_urls.add(citation)
+    # Create a list of cited URLs
+    cited_urls = set()
+    for citation in cited_docs:
+        cited_urls.add(retrieved_docs[int(citation)].metadata["source"])
 
-    # # Combine PDF and URL sources into a single content block
-    # combined_sources = "\n".join(list(cited_urls))
+    if cited_urls:
+        msg.content += "\n\nKilder:\n\n"
+        for url in cited_urls:
+            msg.content += f"1. {url}\n"
+        await msg.update()
 
-    # # Check if there are any sources before adding "Kilder"
-    # if combined_sources:
-    #     await cl.Message(
-    #         content=f"{response_text}\n\nKilder:\n{combined_sources}"
-    #     ).send()
-    # else:
-    #     await cl.Message(content=response_text).send()
-
-    # Update chat history
+    # Update the chat history
     chat_history.add_user_message(message.content)
-    chat_history.add_ai_message(chunk["cited_answer"].answer)
+    chat_history.add_ai_message(ai_answer)
     cl.user_session.set("chat_history", chat_history)
 
 
