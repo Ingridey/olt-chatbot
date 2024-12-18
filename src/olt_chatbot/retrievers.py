@@ -44,13 +44,25 @@ def write_docstores_to_disk(docs: Iterator[Document]) -> None:
 
     # Make two independent interators, so we can feed one to each of the indexers.
     docs1, docs2 = itertools.tee(docs, 2)
-    logger.info("Creating vector retriever")
-    Chroma.from_documents(
-        filter_complex_metadata(text_splitter.split_documents(docs1)),
-        embedding=EMBEDDING,
+
+    # We need to add the documents to the Chroma db in chunks. First create an empty
+    # database collection:
+    vector_store = Chroma(
+        embedding_function=EMBEDDING,
         persist_directory=config.CHROMA_DB_PATH,
     )
 
+    # Then loop over the documents in batches, create chunks, and add each chunk to the
+    # database.
+    for i, doc_chunk in enumerate(itertools.batched(docs1, 100)):
+        chunks = filter_complex_metadata(text_splitter.split_documents(doc_chunk))
+        logger.info(
+            f"Chroma: Processing batch {i} with {len(doc_chunk)} documents "
+            f"and {len(chunks)} chunks."
+        )
+        vector_store.add_documents(chunks)
+
+    # Finally, feed the second iterator to BM25 in one go.
     logger.info("Creating BM25 retriever")
     bm25_retriever = BM25Retriever.from_documents(text_splitter.split_documents(docs2))
     with config.BM25_RETRIEVER_PATH.open("wb") as file:
@@ -67,11 +79,11 @@ def load_retriever_from_disk(k: int = 15) -> BaseRetriever:
     vector_retriever = vectordb.as_retriever(search_kwargs={"k": k})
 
     # Load BM25 retriever from disk
-    with config.BM25_RETRIEVER_PATH.open("rb") as file:
-        bm25_retriever = pickle.load(file)  # noqa: S301
-        bm25_retriever.k = k
+    # with config.BM25_RETRIEVER_PATH.open("rb") as file:
+    #     bm25_retriever = pickle.load(file)
+    #     bm25_retriever.k = k
 
     # ensemble_retriever = EnsembleRetriever(
     #     retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
     # )
-    return vector_retriever
+    return vector_retriever  # noqa: RET504
