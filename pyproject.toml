@@ -24,6 +24,7 @@ dependencies = [
     "pymupdf >= 1.24.13",
     "pypdf2 >= 3.0.1",
     "pre-commit>=4.0.1",
+    "onnxruntime==1.19.2",          # onnxruntime 1.20.x doesn't exist for MacOS < 13
 ]
 
 [dependency-groups]
