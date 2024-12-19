@@ -4,6 +4,7 @@ import itertools
 import pickle
 from collections.abc import Iterator
 
+from langchain.retrievers.ensemble import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores.utils import filter_complex_metadata
@@ -27,6 +28,8 @@ def update_retriever_databases() -> None:
     all_docs = itertools.chain(
         get_docs_from_url("https://olympiatoppen.no/", max_depth=100),
         get_docs_from_url("https://olt-skala.nif.no/", max_depth=100),
+        get_docs_from_url("https://www.summit2028.no/", max_depth=100),
+        get_docs_from_url("https://www.teamnor.no/", max_depth=100),
         read_pdfs_from_fagstoff_folder(),
     )
     write_docstores_to_disk(all_docs)
@@ -61,7 +64,7 @@ def write_docstores_to_disk(docs: Iterator[Document]) -> None:
                 f"Chroma: Processing {len(chunk_batch)} chunks from batch {i} with "
                 f"{len(doc_chunk)} documents and {len(chunks)} chunks."
             )
-            vector_store.add_documents(chunks)
+            vector_store.add_documents(list(chunk_batch))
 
     # Finally, feed the second iterator to BM25 in one go.
     logger.info("Creating BM25 retriever")
@@ -80,11 +83,12 @@ def load_retriever_from_disk(k: int = 15) -> BaseRetriever:
     vector_retriever = vectordb.as_retriever(search_kwargs={"k": k})
 
     # Load BM25 retriever from disk
-    # with config.BM25_RETRIEVER_PATH.open("rb") as file:
-    #     bm25_retriever = pickle.load(file)
-    #     bm25_retriever.k = k
+    with config.BM25_RETRIEVER_PATH.open("rb") as file:
+        bm25_retriever = pickle.load(file)  # noqa: S301
+        bm25_retriever.k = k
 
-    # ensemble_retriever = EnsembleRetriever(
-    #     retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
-    # )
-    return vector_retriever  # noqa: RET504
+    ensemble_retriever = EnsembleRetriever(  # noqa: F841
+        retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
+    )
+
+    return vector_retriever

@@ -112,7 +112,7 @@ async def on_message(message: cl.Message) -> None:
                 # HTML pages will be shown as links with a title
                 markdown_string = f"[{metadata['title']}]({metadata['source']})"
             else:
-                # PDFs will be shown as plain text with a link
+                # PDFs will be shown as plain text without a link
                 markdown_string = metadata["source"]
 
             # Create a numbered list of citations
