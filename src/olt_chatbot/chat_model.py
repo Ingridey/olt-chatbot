@@ -22,7 +22,7 @@ from olt_chatbot.retrievers import load_retriever_from_disk
 # This is the response object from the model. It Forces the model to cite the sources
 # used.
 class CitedAnswer(BaseModel):
-    """Answer the user question based only on the given sources, and cite the sources used."""  # noqa:E501
+    """Answer the user question based only on the given sources, and cite the sources used."""  # noqa: E501
 
     answer: str = Field(
         ...,
@@ -32,7 +32,7 @@ class CitedAnswer(BaseModel):
     )
     citations: list[str] = Field(
         ...,
-        description="The reference of the SPECIFIC sources which justify the answer.",
+        description="The reference of the SPECIFIC source IDs which justify the answer.",  # noqa: E501
     )
 
 
