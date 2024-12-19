@@ -24,15 +24,18 @@ LLM_GENERATORS: dict[str, ChatOpenAI] = {
         model="gpt-3.5-turbo-1106",
         max_tokens=2048,
         temperature=0.0,
+        seed=0,
     ),
     "gpt-4o-mini": ChatOpenAI(
         model="gpt-4o-mini",
         max_tokens=2048,
         temperature=0.0,
+        seed=0,
     ),
     "gpt-4o": ChatOpenAI(
         model="gpt-4o",
         max_tokens=2048,
         temperature=0.0,
+        seed=0,
     ),
 }
