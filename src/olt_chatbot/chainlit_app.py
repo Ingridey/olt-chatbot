@@ -86,11 +86,21 @@ async def on_message(message: cl.Message) -> None:
     # Extract the citations and create elements for the message
     cited_doc_indices: list[str] = chunk["cited_answer"].get("citations", [])
 
+    # Debug info
+    logger.debug(f"The retriver found {len(retrieved_docs)} chunks")
+    logger.debug(f"The following chunks are cited: {cited_doc_indices}")
+
     # There could potentially be multiple chunks retrieved from the same document.
     # Create a dict of unique document metadata, where the key is the source field.
     cited_metadata = {}
-    for i in cited_doc_indices:
-        metadata = retrieved_docs[int(i)].metadata
+    for i_str in cited_doc_indices:
+        try:
+            i = int(i_str)
+        except ValueError:
+            continue
+        if not 0 <= i <= len(retrieved_docs):
+            continue
+        metadata = retrieved_docs[i].metadata
         if metadata["source"] not in cited_metadata:
             cited_metadata[metadata["source"]] = metadata
 
