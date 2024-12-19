@@ -53,14 +53,15 @@ def write_docstores_to_disk(docs: Iterator[Document]) -> None:
     )
 
     # Then loop over the documents in batches, create chunks, and add each chunk to the
-    # database.
-    for i, doc_chunk in enumerate(itertools.batched(docs1, 100)):
+    # database. The maximum number of chunks is 5461.
+    for i, doc_chunk in enumerate(itertools.batched(docs1, 25), start=1):
         chunks = filter_complex_metadata(text_splitter.split_documents(doc_chunk))
-        logger.info(
-            f"Chroma: Processing batch {i} with {len(doc_chunk)} documents "
-            f"and {len(chunks)} chunks."
-        )
-        vector_store.add_documents(chunks)
+        for chunk_batch in itertools.batched(chunks, 5000):
+            logger.info(
+                f"Chroma: Processing {len(chunk_batch)} chunks from batch {i} with "
+                f"{len(doc_chunk)} documents and {len(chunks)} chunks."
+            )
+            vector_store.add_documents(chunks)
 
     # Finally, feed the second iterator to BM25 in one go.
     logger.info("Creating BM25 retriever")
