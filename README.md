@@ -39,4 +39,4 @@ uv run start-chainlit
 CHAINLIT_PORT=8910 uv run start-chainlit
 ```
 
-You can then point your browser to http://localhost:8888 (or your port of choice)
+You can then point your browser to http://localhost:8888 (or your port of choice).
